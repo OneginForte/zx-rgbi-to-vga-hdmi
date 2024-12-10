@@ -15,6 +15,7 @@ video_mode_t vga_640x480 = {
     .v_back_porch = 33,
     .sync_polarity = 0b11000000, // negative
     .div = 2,
+    .divV = 2,
 };
 
 video_mode_t vga_800x600 = {
@@ -32,6 +33,7 @@ video_mode_t vga_800x600 = {
     .v_back_porch = 23,
     .sync_polarity = 0b00000000, // positive
     .div = 2,
+    .divV = 2,
 };
 
 video_mode_t vga_1024x768 = {
@@ -49,6 +51,7 @@ video_mode_t vga_1024x768 = {
     .v_back_porch = 29,
     .sync_polarity = 0b11000000, // negative
     .div = 3,
+    .divV = 3,
 };
 
 video_mode_t vga_1280x1024_d3 = {
@@ -66,10 +69,11 @@ video_mode_t vga_1280x1024_d3 = {
     .v_back_porch = 38,
     .sync_polarity = 0b00000000, // positive
     .div = 3,
+    .divV = 3,
 };
 
 video_mode_t vga_1280x1024_d4 = {
-    .sys_freq = 243000, // 270000, // switch to a higher system clock if the image is unstable
+    .sys_freq = 243000, //270000, // switch to a higher system clock if the image is unstable
     .pixel_freq = 108000000.0,
     .h_visible_area = 1280,
     .v_visible_area = 1024,
@@ -83,8 +87,28 @@ video_mode_t vga_1280x1024_d4 = {
     .v_back_porch = 38,
     .sync_polarity = 0b00000000, // positive
     .div = 4,
+    .divV = 4,
 };
 
-video_mode_t *vga_modes[] = {&vga_640x480, &vga_640x480, &vga_800x600, &vga_1024x768, &vga_1280x1024_d3, &vga_1280x1024_d4};
+video_mode_t vga_1280x1024_d24 = {
+    .sys_freq = 270000, // switch to a higher system clock if the image is unstable
+    .pixel_freq = 108000000.0,
+    .h_visible_area = 1280,
+    .v_visible_area = 1024,
+    .whole_line = 1680, // 1688
+    .whole_frame = 1066,
+    .h_front_porch = 48,
+    .h_sync_pulse = 112,
+    .h_back_porch = 240, // 248
+    .v_front_porch = 1,
+    .v_sync_pulse = 3,
+    .v_back_porch = 38,
+    .sync_polarity = 0b00000000, // positive
+    .div = 2,
+    .divV = 4,
+};
 
-uint8_t g_v_buf[V_BUF_SZ * 3];
+video_mode_t *vga_modes[] = {&vga_640x480, &vga_640x480, &vga_800x600, &vga_1024x768, &vga_1280x1024_d3, &vga_1280x1024_d24, &vga_1280x1024_d4};
+
+//uint8_t g_v_buf[V_BUF_SZ * 3];
+uint8_t g_v_buf[V_BUF_SZ];

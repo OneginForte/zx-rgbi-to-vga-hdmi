@@ -91,6 +91,7 @@ void print_video_out_menu()
   Serial.println("  4   VGA   1024x768 (div 3)");
   Serial.println("  5   VGA  1280x1024 (div 3)");
   Serial.println("  6   VGA  1280x1024 (div 4)");
+  Serial.println("  7   VGA  1280x1024 (div 2h4v)");
   Serial.println("");
   Serial.println("  p   show configuration");
   Serial.println("  h   show help (this menu)");
@@ -131,6 +132,7 @@ void print_cap_sync_mode_menu()
   Serial.println("");
   Serial.println("  1   self-synchronizing");
   Serial.println("  2   external clock");
+  Serial.println("  3   Z80 clock");
   Serial.println("");
   Serial.println("  p   show configuration");
   Serial.println("  h   show help (this menu)");
@@ -167,6 +169,20 @@ void print_ext_clk_divider_menu()
   Serial.println("");
 }
 
+void print_len_VS_menu()
+{
+  Serial.println("");
+  Serial.println("      * Vertical sync length (pix) *");
+  Serial.println("");
+  Serial.println("  a   increment length (+1)");
+  Serial.println("  z   decrement length (-1)");
+  Serial.println("");
+  Serial.println("  p   show configuration");
+  Serial.println("  h   show help (this menu)");
+  Serial.println("  q   exit to main menu");
+  Serial.println("");
+}
+
 void print_video_sync_mode_menu()
 {
   Serial.println("");
@@ -187,6 +203,10 @@ void print_image_tuning_menu()
   Serial.println("");
   Serial.println("  a   increment delay (+1)");
   Serial.println("  z   decrement delay (-1)");
+  Serial.println("");
+  Serial.println("  1   set delay ext clock");
+  Serial.println("  2   set delay Z80 clock rise");
+  Serial.println("  3   set delay Z80 clock fall");
   Serial.println("");
   Serial.println("  i   shift image UP");
   Serial.println("  k   shift image DOWN");
@@ -256,6 +276,10 @@ void print_video_out_mode()
     Serial.println("VGA 1280x1024 (div 4)");
     break;
 
+  case VGA1280x1024_d24:
+    Serial.println("VGA 1280x1024 (div 2h4v)");
+    break;
+
   default:
     break;
   }
@@ -289,6 +313,10 @@ void print_cap_sync_mode()
   case SELF:
     Serial.println("self-synchronizing");
     break;
+    
+  case Z80_FREQ_MODE:
+    Serial.println("Z80 clock");
+    break;
 
   case EXT:
     Serial.println("external clock");
@@ -312,10 +340,26 @@ void print_ext_clk_divider()
   Serial.println(settings.ext_clk_divider, DEC);
 }
 
+void print_len_VS()
+{
+  Serial.print("  Vertical sync (pix)...... ");
+  Serial.println(settings.len_VS, DEC);
+}
+
+
+static char delay_no = 0;
+
 void print_capture_delay()
 {
-  Serial.print("  Capture delay ............... ");
+  if (delay_no==0) Serial.print("*");
+  Serial.print("  Capture delay ext clock...... ");
   Serial.println(settings.delay, DEC);
+  if (delay_no==1) Serial.print("*");
+  Serial.print("  Capture delay Z80 clock rise. ");
+  Serial.println(settings.delay_rise, DEC);
+  if (delay_no==2) Serial.print("*");
+  Serial.print("  Capture delay Z80 clock fall. ");
+  Serial.println(settings.delay_fall, DEC);
 }
 
 void print_x_offset()
@@ -416,6 +460,7 @@ void print_settings()
   print_x_offset();
   print_y_offset();
   print_pin_inversion_mask();
+  print_len_VS();
   print_dividers();
   Serial.println("");
 }
@@ -426,12 +471,33 @@ void set_scanlines_mode()
     set_vga_scanlines_mode(settings.scanlines_mode);
 }
 
+settings_t def_settings =
+{
+  .video_out_mode = VGA1280x1024_d4,
+  .scanlines_mode = false,
+  .x3_buffering_mode = false,
+  .video_sync_mode = false, // composite
+  .cap_sync_mode = EXT,
+  .frequency = 7000000,
+  .ext_clk_divider = 2,
+  .delay = 5,
+  .delay_rise = 5,
+  .delay_fall = 5,
+  .shX = 135,
+  .shY = 15,
+  .pin_inversion_mask = 0b1000000,
+  .len_VS = 30*7,
+};
+
 void setup()
 {
   Serial.begin(9600);
 
   // loading saved settings
   memcpy(&settings, saved_settings, sizeof(settings_t));
+  if (settings.scanlines_mode)
+    settings = def_settings;
+  //settings.ext_clk_divider = 1;
   // correct if there is garbage in the cells
   check_settings(&settings);
 
@@ -535,6 +601,10 @@ void loop()
           break;
         case '6':
           settings.video_out_mode = VGA1280x1024_d4;
+          print_video_out_mode();
+          break;
+        case '7':
+          settings.video_out_mode = VGA1280x1024_d24;
           print_video_out_mode();
           break;
 
@@ -668,6 +738,11 @@ void loop()
 
         case '2':
           settings.cap_sync_mode = EXT;
+          print_cap_sync_mode();
+          break;
+        
+        case '3':
+          settings.cap_sync_mode = Z80_FREQ_MODE;
           print_cap_sync_mode();
           break;
 
@@ -829,6 +904,53 @@ void loop()
 
       break;
     }
+    case 'l':
+    {
+      inbyte = 'h';
+
+      while (1)
+      {
+        sleep_ms(10);
+
+        if (inbyte != 'h' && Serial.available())
+          inbyte = Serial.read();
+
+        switch (inbyte)
+        {
+
+        case 'p':
+          print_len_VS();
+          break;
+
+        case 'h':
+          print_len_VS_menu();
+          break;
+
+        case 'a':
+          settings.len_VS = set_capture_len_VS(settings.len_VS+1);
+          print_len_VS();
+          break;
+
+        case 'z':
+          settings.len_VS = set_capture_len_VS(settings.len_VS-1);
+          print_len_VS();
+          break;
+
+        default:
+          break;
+        }
+
+        if (inbyte == 'q')
+        {
+          inbyte = 'h';
+          break;
+        }
+
+        inbyte = 0;
+      }
+
+      break;
+    }
 
     case 'y':
     {
@@ -876,7 +998,6 @@ void loop()
     case 't':
     {
       inbyte = 'h';
-
       while (1)
       {
         sleep_ms(10);
@@ -898,12 +1019,39 @@ void loop()
           break;
 
         case 'a':
-          settings.delay = set_capture_delay(settings.delay + 1);
+          switch (delay_no)
+          {
+          case 0:
+            settings.delay = set_capture_delay(settings.delay + 1);
+            break;
+          case 1:
+            settings.delay_rise = set_capture_delay_rise(settings.delay_rise + 1);
+            break;
+          case 2:
+            settings.delay_fall = set_capture_delay_fall(settings.delay_fall + 1);
+            break;
+          default:
+            break;
+          }
+ 
           print_capture_delay();
           break;
 
         case 'z':
-          settings.delay = set_capture_delay(settings.delay - 1);
+          switch (delay_no)
+          {
+          case 0:
+            settings.delay = set_capture_delay(settings.delay - 1);
+            break;
+          case 1:
+            settings.delay_rise = set_capture_delay_rise(settings.delay_rise - 1);
+            break;
+          case 2:
+            settings.delay_fall = set_capture_delay_fall(settings.delay_fall - 1);
+            break;
+          default:
+            break;
+          }
           print_capture_delay();
           break;
 
@@ -925,6 +1073,21 @@ void loop()
         case 'l':
           settings.shX = set_capture_shX(settings.shX + 1);
           print_x_offset();
+          break;
+        
+        case '1':
+          delay_no = 0;
+          print_capture_delay();
+          break;
+
+        case '2':
+          delay_no = 1;
+          print_capture_delay();
+          break;
+
+        case '3':
+          delay_no = 2;
+          print_capture_delay();
           break;
 
         default:

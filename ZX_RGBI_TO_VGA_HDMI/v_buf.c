@@ -1,7 +1,8 @@
 #include "g_config.h"
 #include "v_buf.h"
 
-uint8_t *v_bufs[3] = {g_v_buf, g_v_buf + V_BUF_SZ, g_v_buf + 2 * V_BUF_SZ};
+//uint8_t *v_bufs[3] = {g_v_buf, g_v_buf + V_BUF_SZ, g_v_buf + 2 * V_BUF_SZ};
+uint8_t *v_bufs[1] = {g_v_buf};
 
 bool show_v_buf[] = {false, false, false};
 
@@ -13,6 +14,7 @@ bool first_frame = true;
 
 void *__not_in_flash_func(get_v_buf_out)()
 {
+#if 0
   if (!x3_buffering_mode | first_frame)
     return v_bufs[0];
 
@@ -31,10 +33,13 @@ void *__not_in_flash_func(get_v_buf_out)()
   }
 
   return v_bufs[v_buf_out_idx];
+#endif
+  return v_bufs[0];
 }
 
 void *__not_in_flash_func(get_v_buf_in)()
 {
+#if 0
   if (!x3_buffering_mode)
     return v_bufs[0];
 
@@ -56,6 +61,8 @@ void *__not_in_flash_func(get_v_buf_in)()
   }
 
   return NULL;
+#endif
+  return v_bufs[0];
 }
 
 void set_v_buf_buffering_mode(bool buffering_mode)
@@ -95,7 +102,7 @@ void draw_welcome_screen_h(video_mode_t video_mode)
 
   for (int y = 0; y < V_BUF_H; y++)
   {
-    uint8_t i = (16 * y * video_mode.div) / v_area;
+    uint8_t i = (16 * y * video_mode.divV) / v_area;
     uint8_t R = (i & 4) ? ((i & 1) ? 0b0100 : 0b1100) : 0;
     uint8_t G = (i & 8) ? ((i & 1) ? 0b0010 : 0b1010) : 0;
     uint8_t B = (i & 2) ? ((i & 1) ? 0b0001 : 0b1001) : 0;

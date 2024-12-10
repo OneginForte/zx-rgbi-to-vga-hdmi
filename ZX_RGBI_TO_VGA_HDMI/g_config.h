@@ -16,6 +16,7 @@ enum cap_sync_mode_t
 {
   SYNC_MODE_MIN,
   SELF = SYNC_MODE_MIN,
+  Z80_FREQ_MODE,
   EXT,
   SYNC_MODE_MAX = EXT,
 };
@@ -29,7 +30,8 @@ enum video_out_mode_t
   VGA1024x768,
   VGA1280x1024_d3,
   VGA1280x1024_d4,
-  VIDEO_MODE_MAX = VGA1280x1024_d4,
+  VGA1280x1024_d24,
+  VIDEO_MODE_MAX = VGA1280x1024_d24,
 };
 
 typedef struct settings_t
@@ -42,9 +44,12 @@ typedef struct settings_t
   uint32_t frequency;
   uint8_t ext_clk_divider;
   int8_t delay;
+  int8_t delay_rise;
+  int8_t delay_fall;
   int16_t shX;
   int16_t shY;
   uint8_t pin_inversion_mask;
+  uint16_t len_VS;
 } settings_t;
 
 typedef struct video_mode_t
@@ -63,6 +68,7 @@ typedef struct video_mode_t
   uint8_t v_back_porch;
   uint8_t sync_polarity;
   uint8_t div;
+  uint8_t divV;
 } video_mode_t;
 
 extern video_mode_t vga_640x480;
@@ -70,6 +76,7 @@ extern video_mode_t vga_800x600;
 extern video_mode_t vga_1024x768;
 extern video_mode_t vga_1280x1024_d3;
 extern video_mode_t vga_1280x1024_d4;
+extern video_mode_t vga_1280x1024_d24;
 
 extern video_mode_t *vga_modes[];
 
@@ -169,8 +176,8 @@ extern uint32_t frame_count;
 #define SM_CAP 0
 
 // video buffer
-#define V_BUF_W 448
-#define V_BUF_H 306
+#define V_BUF_W (320*2)
+#define V_BUF_H 320
 #define V_BUF_SZ (V_BUF_H * V_BUF_W / 2)
 
 // settings MIN values
@@ -181,6 +188,7 @@ extern uint32_t frame_count;
 #define DELAY_MIN 0
 #define shX_MIN 0
 #define shY_MIN 0
+#define len_VS_MIN 0
 
 // settings MAX values
 #define VIDEO_OUT_MODE_MAX VIDEO_MODE_MAX
@@ -191,5 +199,5 @@ extern uint32_t frame_count;
 #define shX_MAX 200
 #define shY_MAX 200
 #define PIN_INVERSION_MASK 0x7f
-
+#define len_VS_MAX 1000
 #endif

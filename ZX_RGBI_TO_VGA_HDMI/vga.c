@@ -101,9 +101,9 @@ void __not_in_flash_func(dma_handler_vga)()
   }
 
   // image area
-  uint8_t line = y % (2 * video_mode.div);
+  uint8_t line = y % (2 * video_mode.divV);
 
-  switch (video_mode.div)
+  switch (video_mode.divV)
   {
   case 2:
   {
@@ -209,7 +209,7 @@ void __not_in_flash_func(dma_handler_vga)()
     break;
   }
 
-  uint8_t *scr_buf = &screen_buf[(uint16_t)((y - v_margin) / video_mode.div) * V_BUF_W / 2];
+  uint8_t *scr_buf = &screen_buf[(uint16_t)((y - v_margin) / video_mode.divV) * V_BUF_W / 2];
   uint16_t *line_buf = (uint16_t *)(*v_out_dma_buf_addr);
 
   for (int i = h_visible_area; i--;)
@@ -232,8 +232,8 @@ void start_vga(video_mode_t v_mode)
   int h_sync_pulse = video_mode.h_sync_pulse / video_mode.div;
 
   h_visible_area = video_mode.h_visible_area / (video_mode.div * 2);
-  v_visible_area = V_BUF_H * video_mode.div;
-  v_margin = (int16_t)((video_mode.v_visible_area - v_visible_area) / (video_mode.div * 2)) * video_mode.div;
+  v_visible_area = V_BUF_H * video_mode.divV;
+  v_margin = (int16_t)((video_mode.v_visible_area - v_visible_area) / (video_mode.divV * 2)) * video_mode.divV;
 
   if (v_margin < 0)
     v_margin = 0;

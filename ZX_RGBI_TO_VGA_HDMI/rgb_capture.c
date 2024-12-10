@@ -91,6 +91,18 @@ int16_t set_capture_shY(int16_t shY)
   return capture_settings.shY;
 }
 
+int16_t set_capture_len_VS(int16_t len_VS)
+{
+  if (len_VS > len_VS_MAX)
+    capture_settings.len_VS = len_VS_MAX;
+  else if (len_VS < len_VS_MIN)
+    capture_settings.len_VS = len_VS_MIN;
+  else
+    capture_settings.len_VS = len_VS;
+
+  return capture_settings.len_VS;
+}
+
 int8_t set_capture_delay(int8_t delay)
 {
   if (delay > DELAY_MAX)
@@ -105,6 +117,34 @@ int8_t set_capture_delay(int8_t delay)
   return capture_settings.delay;
 }
 
+int8_t set_capture_delay_rise(int8_t delay)
+{
+  if (delay > DELAY_MAX)
+    capture_settings.delay_rise = DELAY_MAX;
+  else if (delay < DELAY_MIN)
+    capture_settings.delay_rise = DELAY_MIN;
+  else
+    capture_settings.delay_rise = delay;
+
+  PIO_CAP->instr_mem[offset+1] = nop_opcode | (capture_settings.delay_rise << 8);
+
+  return capture_settings.delay_rise;
+}
+
+int8_t set_capture_delay_fall(int8_t delay)
+{
+  if (delay > DELAY_MAX)
+    capture_settings.delay_fall = DELAY_MAX;
+  else if (delay < DELAY_MIN)
+    capture_settings.delay_fall = DELAY_MIN;
+  else
+    capture_settings.delay_fall = delay;
+
+  PIO_CAP->instr_mem[offset+5] = nop_opcode | (capture_settings.delay_fall << 8);
+
+  return capture_settings.delay_fall;
+}
+
 void set_video_sync_mode(bool video_sync_mode)
 {
   capture_settings.video_sync_mode = video_sync_mode;
@@ -116,6 +156,7 @@ void __not_in_flash_func(dma_handler_capture())
   static uint8_t pix8_s;
   static int x_s;
   static int y_s;
+   int len_VS_pix=capture_settings.len_VS;
 
   uint8_t sync_mask = capture_settings.video_sync_mode ? ((1u << VS_PIN) | (1u << HS_PIN)) : (1u << HS_PIN);
 
@@ -139,15 +180,18 @@ void __not_in_flash_func(dma_handler_capture())
   static uint CS_idx_s = 0;
   uint CS_idx = CS_idx_s;
 
+  bool bVerticalSync = false;
+  bool bCompositeSync = sync_mask == (1u << HS_PIN);
+
   for (int k = CAP_DMA_BUF_SIZE; k--;)
   {
     uint8_t val8 = *buf8++;
-
     x++;
-
-    if ((val8 & sync_mask) != sync_mask) // detect active sync pulses
+    
+    bool bSyncLow = (val8 & sync_mask) != sync_mask;
+    if (bSyncLow || bVerticalSync) // detect active sync pulses
     {
-      if (CS_idx == H_SYNC_PULSE / 2) // start in the middle of the H_SYNC pulse // this should help ignore the spikes
+      if (CS_idx == H_SYNC_PULSE / 2 && !bVerticalSync) //start in the middle of the H_SYNC pulse // this should help ignore the spikes
       {
         y++;
         // set the pointer to the beginning of a new line
@@ -158,10 +202,16 @@ void __not_in_flash_func(dma_handler_capture())
       CS_idx++;
       x = -shX - 1;
 
-      if (sync_mask == (1u << HS_PIN)) // composite sync
+      if (bCompositeSync) // composite sync
       {
-        if (CS_idx < V_SYNC_PULSE) // detect V_SYNC pulse
+        if (bSyncLow && CS_idx < len_VS_pix/*V_SYNC_PULSE*/) // detect V_SYNC pulse
           continue;
+        bVerticalSync = true;
+        CS_idx = 0;
+        if (/*!bSyncLow && */CS_idx < len_VS_pix)
+          continue;
+        // here starts a new frame
+        bVerticalSync = false;
       }
       else if (val8 & (1u << VS_PIN))
         continue;
@@ -185,7 +235,7 @@ void __not_in_flash_func(dma_handler_capture())
         continue;
 
       if ((x < 0) || (y < 0))
-        continue;
+       continue;
 
       if ((x >= V_BUF_W) || (y >= V_BUF_H))
         continue;

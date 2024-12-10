@@ -135,7 +135,7 @@ static void __not_in_flash_func(dma_handler_dvi)()
   if (y < video_mode.v_visible_area)
   {
     // image area
-    uint8_t *scr_buf = &screen_buf[(uint16_t)(y / video_mode.div) * V_BUF_W / 2];
+    uint8_t *scr_buf = &screen_buf[(uint16_t)(y / video_mode.divV) * V_BUF_W / 2];
     uint64_t *line_buf = active_buf;
 
     for (int i = h_visible_area; i--;)
