@@ -30,7 +30,7 @@ void save_settings(settings_t *settings)
   flash_range_erase((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), FLASH_SECTOR_SIZE);
   flash_range_program((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), (uint8_t *)settings, FLASH_PAGE_SIZE);
 
-  // restore_interrupts(ints);
+  restore_interrupts(ints);
   // rp2040.resumeOtherCore();
 }
 
@@ -473,18 +473,18 @@ void set_scanlines_mode()
 
 settings_t def_settings =
 {
-  .video_out_mode = VGA1280x1024_d4,
+  .video_out_mode = VGA1280x1024_d24,
   .scanlines_mode = false,
   .x3_buffering_mode = false,
-  .video_sync_mode = false, // composite
+  .video_sync_mode = true, // separate
   .cap_sync_mode = EXT,
   .frequency = 7000000,
-  .ext_clk_divider = 2,
+  .ext_clk_divider = 1,
   .delay = 5,
   .delay_rise = 5,
   .delay_fall = 5,
-  .shX = 135,
-  .shY = 15,
+  .shX = 169,
+  .shY = 56,
   .pin_inversion_mask = 0b1000000,
   .len_VS = 30*7,
 };
@@ -1153,7 +1153,7 @@ void loop()
 
               uint8_t pin_inversion_mask = 0;
 
-              for (int i = 0; i < str_pin_inversion_mask.length(); i++)
+              for (uint32_t i = 0; i < str_pin_inversion_mask.length(); i++)
               {
                 pin_inversion_mask <<= 1;
                 pin_inversion_mask |= str_pin_inversion_mask[i] == '1' ? 1 : 0;

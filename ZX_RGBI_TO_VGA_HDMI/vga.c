@@ -178,7 +178,7 @@ void __not_in_flash_func(dma_handler_vga)()
   default:
     break;
   }
-
+  v_out_dma_buf_addr = NULL;
   switch (line)
   {
   case 0:

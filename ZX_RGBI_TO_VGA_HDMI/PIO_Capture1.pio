@@ -1,0 +1,19 @@
+.program pio_program_capture_1
+.define F_PIN 6
+.define HS_PIN 4
+start:
+    nop                 ; a capture delay will be added to this command
+l01:
+    ;set    x, 0         ; an external clock divider will be added to this command
+    wait   1 gpio, F_PIN
+    in     pins, 8
+    wait   0 gpio, F_PIN
+    ;jmp    x--, start
+    push   block
+    jmp    pin, l01
+    in     pins, 8
+    wait   1 gpio, HS_PIN
+    push   block    
+    jmp    start
+
+.wrap

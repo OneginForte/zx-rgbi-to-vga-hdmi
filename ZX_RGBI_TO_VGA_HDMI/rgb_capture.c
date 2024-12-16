@@ -9,28 +9,28 @@
 #include "hardware/structs/pll.h"
 #include "hardware/structs/systick.h"
 
+static int dma_ch0;
 static int dma_ch1;
-uint8_t *cap_buf;
+uint8_t* cap_buf = NULL;
 settings_t capture_settings;
 uint16_t offset;
 
 uint32_t frame_count = 0;
 
 static uint32_t cap_dma_buf[2][CAP_DMA_BUF_SIZE / 4];
-static uint32_t *cap_dma_buf_addr[2];
+static uint32_t* cap_dma_buf_addr[2];
 
-void check_settings(settings_t *settings)
-{
+void check_settings(settings_t* settings) {
 
   if (settings->video_out_mode > VIDEO_OUT_MODE_MAX)
     settings->video_out_mode = VIDEO_OUT_MODE_MAX;
-  else if (settings->video_out_mode < VIDEO_OUT_MODE_MIN)
-    settings->video_out_mode = VIDEO_OUT_MODE_MIN;
+  // else if (settings->video_out_mode < VIDEO_OUT_MODE_MIN)
+  //   settings->video_out_mode = VIDEO_OUT_MODE_MIN;
 
   if (settings->cap_sync_mode > CAP_SYNC_MODE_MAX)
     settings->cap_sync_mode = CAP_SYNC_MODE_MAX;
-  else if (settings->cap_sync_mode < CAP_SYNC_MODE_MIN)
-    settings->cap_sync_mode = CAP_SYNC_MODE_MIN;
+  // else if (settings->cap_sync_mode < CAP_SYNC_MODE_MIN)
+  //   settings->cap_sync_mode = CAP_SYNC_MODE_MIN;
 
   if (settings->frequency > FREQUENCY_MAX)
     settings->frequency = FREQUENCY_MAX;
@@ -61,14 +61,12 @@ void check_settings(settings_t *settings)
     settings->pin_inversion_mask = PIN_INVERSION_MASK;
 }
 
-void set_capture_settings(settings_t *settings)
-{
+void set_capture_settings(settings_t* settings) {
   memcpy(&capture_settings, settings, sizeof(settings_t));
   check_settings(&capture_settings);
 }
 
-int16_t set_capture_shX(int16_t shX)
-{
+int16_t set_capture_shX(int16_t shX) {
   if (shX > shX_MAX)
     capture_settings.shX = shX_MAX;
   else if (shX < shX_MIN)
@@ -79,8 +77,7 @@ int16_t set_capture_shX(int16_t shX)
   return capture_settings.shX;
 }
 
-int16_t set_capture_shY(int16_t shY)
-{
+int16_t set_capture_shY(int16_t shY) {
   if (shY > shY_MAX)
     capture_settings.shY = shY_MAX;
   else if (shY < shY_MIN)
@@ -91,8 +88,7 @@ int16_t set_capture_shY(int16_t shY)
   return capture_settings.shY;
 }
 
-int16_t set_capture_len_VS(int16_t len_VS)
-{
+int16_t set_capture_len_VS(int16_t len_VS) {
   if (len_VS > len_VS_MAX)
     capture_settings.len_VS = len_VS_MAX;
   else if (len_VS < len_VS_MIN)
@@ -103,8 +99,7 @@ int16_t set_capture_len_VS(int16_t len_VS)
   return capture_settings.len_VS;
 }
 
-int8_t set_capture_delay(int8_t delay)
-{
+int8_t set_capture_delay(int8_t delay) {
   if (delay > DELAY_MAX)
     capture_settings.delay = DELAY_MAX;
   else if (delay < DELAY_MIN)
@@ -117,8 +112,7 @@ int8_t set_capture_delay(int8_t delay)
   return capture_settings.delay;
 }
 
-int8_t set_capture_delay_rise(int8_t delay)
-{
+int8_t set_capture_delay_rise(int8_t delay) {
   if (delay > DELAY_MAX)
     capture_settings.delay_rise = DELAY_MAX;
   else if (delay < DELAY_MIN)
@@ -126,13 +120,12 @@ int8_t set_capture_delay_rise(int8_t delay)
   else
     capture_settings.delay_rise = delay;
 
-  PIO_CAP->instr_mem[offset+1] = nop_opcode | (capture_settings.delay_rise << 8);
+  PIO_CAP->instr_mem[offset + 1] = nop_opcode | (capture_settings.delay_rise << 8);
 
   return capture_settings.delay_rise;
 }
 
-int8_t set_capture_delay_fall(int8_t delay)
-{
+int8_t set_capture_delay_fall(int8_t delay) {
   if (delay > DELAY_MAX)
     capture_settings.delay_fall = DELAY_MAX;
   else if (delay < DELAY_MIN)
@@ -140,110 +133,299 @@ int8_t set_capture_delay_fall(int8_t delay)
   else
     capture_settings.delay_fall = delay;
 
-  PIO_CAP->instr_mem[offset+5] = nop_opcode | (capture_settings.delay_fall << 8);
+  PIO_CAP->instr_mem[offset + 5] = nop_opcode | (capture_settings.delay_fall << 8);
 
   return capture_settings.delay_fall;
 }
 
-void set_video_sync_mode(bool video_sync_mode)
-{
+void set_video_sync_mode(bool video_sync_mode) {
   capture_settings.video_sync_mode = video_sync_mode;
 }
 
-void __not_in_flash_func(dma_handler_capture())
-{
-  static uint32_t dma_buf_idx;
+void __not_in_flash_func(dma_handler_capture()) {
+  if (!cap_buf)
+    cap_buf = get_v_buf_in();
+  static uint32_t dma_buf_idx=0;
   static uint8_t pix8_s;
   static int x_s;
   static int y_s;
-   int len_VS_pix=capture_settings.len_VS;
+  uint16_t len_VS_pix = capture_settings.len_VS;
 
   uint8_t sync_mask = capture_settings.video_sync_mode ? ((1u << VS_PIN) | (1u << HS_PIN)) : (1u << HS_PIN);
 
   dma_hw->ints1 = 1u << dma_ch1;
-  dma_channel_set_read_addr(dma_ch1, &cap_dma_buf_addr[dma_buf_idx & 1], false);
-
+  dma_channel_set_read_addr(dma_ch1, &cap_dma_buf_addr[(dma_buf_idx + 1) % 2], false);
+  
+  //dma_channel_set_write_addr(dma_ch0, &cap_dma_buf_addr[(dma_buf_idx + 1) % 2], false);
+  //dma_channel_set_trans_count(dma_ch0, CAP_DMA_BUF_SIZE, false);
+  
   int shX = shX_MAX - capture_settings.shX;
   int shY = capture_settings.shY;
 
-  uint8_t *buf8 = (uint8_t *)cap_dma_buf[dma_buf_idx & 1];
+  uint8_t* buf8 = (uint8_t*)cap_dma_buf[(dma_buf_idx + 1) % 2];
   dma_buf_idx++;
+  if (dma_buf_idx ==1)
+    return;
   gpio_put(PIN_LED, frame_count & 0x20);
 
-  register uint8_t pix8 = pix8_s;
-  register int x = x_s;
-  register int y = y_s;
+  uint8_t pix8 = pix8_s;
+  int x = x_s;
+  int y = y_s;
 
-  static uint8_t *cap_buf8_s = g_v_buf;
-  uint8_t *cap_buf8 = cap_buf8_s;
+  static uint8_t* cap_buf8_s = g_v_buf;
+  uint8_t* cap_buf8 = cap_buf8_s;
 
   static uint CS_idx_s = 0;
   uint CS_idx = CS_idx_s;
 
-  bool bVerticalSync = false;
   bool bCompositeSync = sync_mask == (1u << HS_PIN);
+  //uint8_t state = 0;
 
-  for (int k = CAP_DMA_BUF_SIZE; k--;)
-  {
-    uint8_t val8 = *buf8++;
-    x++;
-    
-    bool bSyncLow = (val8 & sync_mask) != sync_mask;
-    if (bSyncLow || bVerticalSync) // detect active sync pulses
+  const uint8_t HS_MASK = 1u << HS_PIN;
+  const uint8_t VS_MASK = 1u << VS_PIN;
+  const uint32_t sync32_mask = (((uint32_t)VS_MASK) << 24) | (((uint32_t)VS_MASK) << 16) | (((uint32_t)VS_MASK) << 8) | ((uint32_t)VS_MASK);
+  bool bSkipToEndOfFrame = false;
+#if 1
+  if (cap_buf)
+    for (int i = 0; i < 200; ++i)
+      cap_buf[i + i * V_BUF_W / 2] = 0xFF;
+#endif
+  for (int k = CAP_DMA_BUF_SIZE; --k;) {
+#if 0
+    if (bSkipToEndOfFrame && ((uint32_t)buf8 & 3u) == 0 && k > 3)
     {
-      if (CS_idx == H_SYNC_PULSE / 2 && !bVerticalSync) //start in the middle of the H_SYNC pulse // this should help ignore the spikes
+      uint32_t val32 = *(uint32_t*)buf8;
+      if ((val32 & sync32_mask) == sync32_mask)
       {
+        k -= 3;
+        buf8 += 4;
+        continue;
+      }
+      bSkipToEndOfFrame = false;
+    }
+#endif
+#if 0
+    if ((uint32_t)buf8 & 3u == 0 && k > 3)
+    {
+      uint32_t val32 = *(uint32_t*)buf8;
+      if ((val32 & sync32_mask) == sync32_mask)
+      {
+        x += 4;
+        buf8 += 4;
+        k -= 3;
+        if ((x < 0) || (y < 0))
+          continue;
+        if ((x >= V_BUF_W) || (y >= V_BUF_H))
+          continue;
+        val32 &= 0x0f0f0f0f;
+        uint32_t v = (val32 | (val32 >> 4));
+        *cap_buf8++ = v;// & 0xFF;
+        *cap_buf8++ = (v >> 16);// & 0xFF;
+        continue;
+      }
+    }
+#endif
+    const uint8_t val8 = *buf8++;
+    x++;
+
+    bool bSyncLow = (val8 & sync_mask) != sync_mask;
+#if 0
+    if (bSyncLow || state != 0) // detect active sync pulses
+    {
+      if (!bCompositeSync)
+      {
+        switch (state)
+        {
+        case 0:
+          if ((val8 & HS_MASK) == 0)
+          {
+            CS_idx = 0;
+            state = 1;
+          }
+          else if ((val8 & VS_MASK) == 0)
+          {
+            CS_idx = 0;
+            state = 10;
+          }
+          continue;
+        case 1:
+          if ((val8 & HS_MASK) != 0)
+          {
+            state = 0;
+            continue;
+          }
+          CS_idx++;
+          x = -shX - 1;
+          if (CS_idx == H_SYNC_PULSE / 2) //start in the middle of the H_SYNC pulse // this should help ignore the spikes
+          {
+            state = 2;
+            y++;
+          }
+          continue;
+        case 2:
+          // set the pointer to the beginning of a new line
+          if (y >= 0 && cap_buf != NULL)
+            cap_buf8 = &cap_buf[y * V_BUF_W / 2];
+          if ((val8 & HS_MASK) != 0)
+            state = 0;
+          continue;
+        case 10:
+          if ((val8 & VS_MASK) != 0)
+          {
+            state = 11;
+            continue;
+          }
+          CS_idx++;
+          x = -shX - 1;
+          continue;
+        case 11:
+          // start capture of a new frame
+          if (y >= 0)
+          {
+            if (frame_count > 10) // power on delay // noise immunity at the sync input
+              cap_buf = get_v_buf_in();
+
+            frame_count++;
+          }
+          y = -shY - 1;
+          state = 0;
+          continue;
+        }
+      }
+      else // bCompositeSync
+      {
+        switch (state)
+        {
+        case 0:
+          if ((val8 & HS_MASK) == 0)
+          {
+            CS_idx = 0;
+            state = 1;
+          }
+          continue;
+        case 1:
+          if ((val8 & HS_MASK) != 0)
+          {
+            state = 0;
+            continue;
+          }
+          CS_idx++;
+          x = -shX - 1;
+          if (CS_idx == H_SYNC_PULSE / 2) //start in the middle of the H_SYNC pulse // this should help ignore the spikes
+          {
+            state = 2;
+            y++;
+          }
+          continue;
+        case 2:
+          CS_idx++;
+          if (CS_idx == len_VS_pix)
+          {
+            state = 3;
+            continue;
+          }
+          if ((val8 & HS_MASK) != 0)
+          {
+            // set the pointer to the beginning of a new line
+            if ((y >= 0) && (cap_buf != NULL))
+              cap_buf8 = &(((uint8_t*)cap_buf)[y * V_BUF_W / 2]);
+            state = 0;
+          }
+          continue;
+        case 3:
+          if ((val8 & HS_MASK) != 0)
+          {
+            CS_idx = 0;
+            state = 4;
+            continue;
+          }
+          x = -shX - 1;
+          continue;
+        case 4:
+          CS_idx++;
+          if ((val8 & HS_MASK) == 0)
+          {
+            state = 3;
+            continue;
+          }
+          // start capture of a new frame
+          if (CS_idx == 2 * H_SYNC_PULSE)
+          {
+            if (y >= 0)
+            {
+              if (frame_count > 10) // power on delay // noise immunity at the sync input
+                cap_buf = get_v_buf_in();
+
+              frame_count++;
+              y = -shY - 1;
+            }
+            state = 0;
+          }
+          continue;
+        }
+      }
+    }
+#else
+    if (bSyncLow)  // detect active sync pulses
+    {
+      if (x > 0 && (val8 & HS_MASK) == 0 && CS_idx == H_SYNC_PULSE)  // start in the middle of the H_SYNC pulse // this should help ignore the spikes
+      {
+        //if (x>730)
         y++;
+        x = -shX - 1;
         // set the pointer to the beginning of a new line
         if ((y >= 0) && (cap_buf != NULL))
-          cap_buf8 = &(((uint8_t *)cap_buf)[y * V_BUF_W / 2]);
+          cap_buf8 = cap_buf + y * (int32_t)(V_BUF_W / 2);
+        continue;
       }
 
       CS_idx++;
-      x = -shX - 1;
 
-      if (bCompositeSync) // composite sync
+      if (bCompositeSync)  // composite sync
       {
-        if (bSyncLow && CS_idx < len_VS_pix/*V_SYNC_PULSE*/) // detect V_SYNC pulse
+        if (CS_idx < len_VS_pix /*V_SYNC_PULSE*/)  // detect V_SYNC pulse
           continue;
-        bVerticalSync = true;
-        CS_idx = 0;
-        if (/*!bSyncLow && */CS_idx < len_VS_pix)
-          continue;
-        // here starts a new frame
-        bVerticalSync = false;
-      }
-      else if (val8 & (1u << VS_PIN))
+      } else if ((val8 & VS_MASK) != 0)
         continue;
-
       // start capture of a new frame
-      if (y >= 0)
-      {
-        if (frame_count > 10) // power on delay // noise immunity at the sync input
+      if ((y >= 0) && (val8 & VS_MASK) == 0 /*&& CS_idx == len_VS_pix*/) {
+        bSkipToEndOfFrame = false;
+        if (frame_count > 10)  // power on delay // noise immunity at the sync input
+        {
           cap_buf = get_v_buf_in();
+          cap_buf8 = NULL;
+        }
 
         frame_count++;
+        y = -shY - 1;
       }
-
-      y = -shY - 1;
       continue;
     }
-
-    if (x & 1)
-    {
-      if (cap_buf == NULL)
+#endif
+    if (x & 1) {
+      if (cap_buf == NULL || cap_buf8 == NULL)
         continue;
 
       if ((x < 0) || (y < 0))
-       continue;
-
-      if ((x >= V_BUF_W) || (y >= V_BUF_H))
         continue;
 
-      *cap_buf8++ = (pix8 & 0xf) | (val8 << 4);
-    }
-    else
-    {
+      if (x >= V_BUF_W)
+        continue;
+      if (y >= V_BUF_H) {
+        bSkipToEndOfFrame = true;
+        continue;
+      }
+
+      uint8_t c = (pix8 & 0xf) | (val8 << 4);
+      //if (c!=0)
+      *cap_buf8 = c;
+      cap_buf8++;
+      if (cap_buf8 > cap_buf + V_BUF_SZ) {
+        bSkipToEndOfFrame = false;
+        CS_idx_s = CS_idx;
+        cap_buf8 = cap_buf;
+      }
+    } else {
       CS_idx = 0;
       pix8 = val8;
     }
@@ -256,8 +438,7 @@ void __not_in_flash_func(dma_handler_capture())
   CS_idx_s = CS_idx;
 }
 
-void calculate_clkdiv(float freq, uint16_t *div_int, uint8_t *div_frac)
-{
+void calculate_clkdiv(float freq, uint16_t* div_int, uint8_t* div_frac) {
   uint8_t div_frac_2;
 
   float clock = clock_get_hz(clk_sys);
@@ -282,8 +463,7 @@ void calculate_clkdiv(float freq, uint16_t *div_int, uint8_t *div_frac)
   return;
 }
 
-void start_capture(settings_t *settings)
-{
+void start_capture(settings_t* settings) {
   set_capture_settings(settings);
 
   uint8_t inv_mask = capture_settings.pin_inversion_mask;
@@ -292,8 +472,7 @@ void start_capture(settings_t *settings)
   digitalWrite(PIN_LED, LOW);
 
   // set capture pins
-  for (int i = CAP_PIN_D0; i < CAP_PIN_D0 + 7; i++)
-  {
+  for (int i = CAP_PIN_D0; i < CAP_PIN_D0 + 7; i++) {
     gpio_init(i);
     gpio_set_dir(i, GPIO_IN);
     gpio_set_input_hysteresis_enabled(i, true);
@@ -305,59 +484,58 @@ void start_capture(settings_t *settings)
   }
 
   // PIO initialization
-  uint wrap;
+  uint wrap = 0;
 
-  switch (capture_settings.cap_sync_mode)
-  {
-  case SELF:
-  {
-    // set initial capture delay
-    pio_program_capture_0_instructions[0] = nop_opcode | ((capture_settings.delay & 0b00011111) << 8);
-    // load PIO program
-    offset = pio_add_program(PIO_CAP, &pio_program_capture_0);
-    // set capture delay = 0
-    pio_program_capture_0_instructions[0] = nop_opcode;
+  switch (capture_settings.cap_sync_mode) {
+    case SELF:
+      {
+        // set initial capture delay
+        pio_program_capture_0_instructions[0] = nop_opcode | ((capture_settings.delay & 0b00011111) << 8);
+        // load PIO program
+        offset = pio_add_program(PIO_CAP, &pio_program_capture_0);
+        // set capture delay = 0
+        pio_program_capture_0_instructions[0] = nop_opcode;
 
-    wrap = offset + pio_program_capture_0.length - 1;
+        wrap = offset + pio_program_capture_0.length - 1;
 
-    break;
-  }
+        break;
+      }
 
-  case EXT:
-  {
-    // set initial capture delay
-    pio_program_capture_1_instructions[0] = nop_opcode | ((capture_settings.delay & 0b00011111) << 8);
-    // set clock divider
-    pio_program_capture_1_instructions[1] = set_opcode | ((capture_settings.ext_clk_divider - 1) & 0b00011111);
-    pio_program_capture_1_instructions[8] = set_opcode | ((capture_settings.ext_clk_divider - 1) & 0b00011111);
-    // load PIO program
-    offset = pio_add_program(PIO_CAP, &pio_program_capture_1);
-    // set capture delay = 0
-    pio_program_capture_1_instructions[0] = nop_opcode;
+    case EXT:
+      {
+        // set initial capture delay
+        pio_program_capture_1_instructions[0] = nop_opcode | ((capture_settings.delay & 0b00011111) << 8);
+        // set clock divider
+        pio_program_capture_1_instructions[1] = set_opcode | ((capture_settings.ext_clk_divider - 1) & 0b00011111);
+        pio_program_capture_1_instructions[8] = set_opcode | ((capture_settings.ext_clk_divider - 1) & 0b00011111);
+        // load PIO program
+        offset = pio_add_program(PIO_CAP, &pio_program_capture_1);
+        // set capture delay = 0
+        pio_program_capture_1_instructions[0] = nop_opcode;
 
-    wrap = offset + pio_program_capture_1.length - 1;
+        wrap = offset + pio_program_capture_1.length - 1;
 
-    break;
-  }
+        break;
+      }
 
-  default:
-    break;
+    default:
+      break;
   }
 
   pio_sm_config c = pio_get_default_sm_config();
   sm_config_set_wrap(&c, offset, wrap);
 
-  sm_config_set_in_shift(&c, false, false, 8); // autopush not needed
+  sm_config_set_in_shift(&c, false, false, 8);  // autopush not needed
   sm_config_set_in_pins(&c, CAP_PIN_D0);
   sm_config_set_jmp_pin(&c, HS_PIN);
   sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
 
-  if (capture_settings.cap_sync_mode == SELF)
-  {
+  if (capture_settings.cap_sync_mode == SELF) {
     uint16_t div_int;
     uint8_t div_frac;
 
-    calculate_clkdiv(capture_settings.frequency, &div_int, &div_frac);
+    uint32_t freq = 12000000;  //capture_settings.frequency;
+    calculate_clkdiv(freq, &div_int, &div_frac);
     sm_config_set_clkdiv_int_frac(&c, div_int, div_frac);
   }
 
@@ -365,7 +543,7 @@ void start_capture(settings_t *settings)
   pio_sm_set_enabled(PIO_CAP, SM_CAP, true);
 
   // DMA initialization
-  int dma_ch0 = dma_claim_unused_channel(true);
+  dma_ch0 = dma_claim_unused_channel(true);
   dma_ch1 = dma_claim_unused_channel(true);
 
   // main (data) DMA channel
@@ -378,12 +556,12 @@ void start_capture(settings_t *settings)
   channel_config_set_chain_to(&c0, dma_ch1);
 
   dma_channel_configure(
-      dma_ch0,
-      &c0,
-      &cap_dma_buf[0][0],    // write address
-      &PIO_CAP->rxf[SM_CAP], // read address
-      CAP_DMA_BUF_SIZE,      //
-      false                  // don't start yet
+    dma_ch0,
+    &c0,
+    &cap_dma_buf[0][0],     // write address
+    &PIO_CAP->rxf[SM_CAP],  // read address
+    CAP_DMA_BUF_SIZE,       //
+    false                   // don't start yet
   );
 
   // control DMA channel
@@ -392,18 +570,18 @@ void start_capture(settings_t *settings)
   channel_config_set_transfer_data_size(&c1, DMA_SIZE_32);
   channel_config_set_read_increment(&c1, false);
   channel_config_set_write_increment(&c1, false);
-  channel_config_set_chain_to(&c1, dma_ch0); // chain to other channel
+  channel_config_set_chain_to(&c1, dma_ch0);  // chain to other channel
 
   cap_dma_buf_addr[0] = &cap_dma_buf[0][0];
   cap_dma_buf_addr[1] = &cap_dma_buf[1][0];
 
   dma_channel_configure(
-      dma_ch1,
-      &c1,
-      &dma_hw->ch[dma_ch0].write_addr, // write address
-      &cap_dma_buf_addr[0],            // read address
-      1,                               //
-      false                            // don't start yet
+    dma_ch1,
+    &c1,
+    &dma_hw->ch[dma_ch0].write_addr,  // write address
+    &cap_dma_buf_addr[0],             // read address
+    1,                                //
+    false                             // don't start yet
   );
 
   dma_channel_set_irq1_enabled(dma_ch1, true);
@@ -412,5 +590,5 @@ void start_capture(settings_t *settings)
   irq_set_exclusive_handler(DMA_IRQ_1, dma_handler_capture);
   irq_set_enabled(DMA_IRQ_1, true);
 
-  dma_start_channel_mask((1u << dma_ch0));
+  dma_start_channel_mask((1u << dma_ch1));
 }

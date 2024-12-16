@@ -4,12 +4,12 @@
 // video timingaaaiikkkkkkkkkkkkkkkkkkkkkkkiiiiiiiiiiiiiiiiiikkkkkkkkkkkkkkk
 //#define H_SYNC_PULSE (4 * 7)  //  4 µs @ 7.0 MHz pixel clock
 //#define V_SYNC_PULSE (30 * 7) // 30 µs @ 7.0 MHz pixel clock
-#define SAMPL_F (12)
+#define SAMPL_F (8)
 #define H_SYNC_PULSE (48 * SAMPL_F / 10)  //  4 µs @ 7.0 MHz pixel clock
 #define V_SYNC_PULSE (40 * SAMPL_F) // 30 µs @ 7.0 MHz pixel clock
 
 #define CAP_LINE_LENGTH 1024
-#define CAP_DMA_BUF_CNT 40//8
+#define CAP_DMA_BUF_CNT 16
 #define CAP_DMA_BUF_SIZE (CAP_LINE_LENGTH * CAP_DMA_BUF_CNT)
 
 extern uint32_t frame_count;

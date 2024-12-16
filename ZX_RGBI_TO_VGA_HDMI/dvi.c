@@ -27,7 +27,7 @@ static void __not_in_flash_func(memset64)(uint64_t *dst, const uint64_t data, ui
 {
   dst[0] = data;
 
-  for (int i = 1; i < size; i++)
+  for (uint32_t i = 1; i < size; i++)
     *++dst = data;
 }
 
