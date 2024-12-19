@@ -36,7 +36,6 @@ const uint16_t set_opcode = 0xe020;
 
 // PIO program with an external capture clock source
 uint16_t pio_program_capture_1_instructions[] = {
-#if 1
     //                         .wrap_target
     0xa042,         //  0: nop                 // a capture delay will be added to this command
     0xe020,         //  1: set    x, 0         // an external clock divider will be added to this command
@@ -55,20 +54,6 @@ uint16_t pio_program_capture_1_instructions[] = {
     0x8020,         // 14: push   block
     0x0008,         // 15: jmp    8
                     //     .wrap
-#else
-            //     .wrap_target
-    0xa042, //  0: nop
-    0x2086, //  1: wait   1 gpio, 6
-    0x4008, //  2: in     pins, 8
-    0x2006, //  3: wait   0 gpio, 6
-    0x8020, //  4: push   block
-    0x00c1, //  5: jmp    pin, 1
-    0x4008, //  6: in     pins, 8
-    0x2084, //  7: wait   1 gpio, 4
-    0x8020, //  8: push   block
-    0x0000, //  9: jmp    0
-            //     .wrap
-#endif
 
 };
 

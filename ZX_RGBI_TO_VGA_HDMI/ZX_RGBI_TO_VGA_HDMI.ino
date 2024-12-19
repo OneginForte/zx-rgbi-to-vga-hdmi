@@ -25,12 +25,13 @@ void save_settings(settings_t *settings)
   check_settings(settings);
 
   rp2040.idleOtherCore();
-  uint32_t ints = save_and_disable_interrupts();
+  //uint32_t ints = 
+  save_and_disable_interrupts();
 
   flash_range_erase((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), FLASH_SECTOR_SIZE);
   flash_range_program((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), (uint8_t *)settings, FLASH_PAGE_SIZE);
 
-  restore_interrupts(ints);
+  // restore_interrupts(ints);
   // rp2040.resumeOtherCore();
 }
 
@@ -132,7 +133,6 @@ void print_cap_sync_mode_menu()
   Serial.println("");
   Serial.println("  1   self-synchronizing");
   Serial.println("  2   external clock");
-  Serial.println("  3   Z80 clock");
   Serial.println("");
   Serial.println("  p   show configuration");
   Serial.println("  h   show help (this menu)");
@@ -203,10 +203,6 @@ void print_image_tuning_menu()
   Serial.println("");
   Serial.println("  a   increment delay (+1)");
   Serial.println("  z   decrement delay (-1)");
-  Serial.println("");
-  Serial.println("  1   set delay ext clock");
-  Serial.println("  2   set delay Z80 clock rise");
-  Serial.println("  3   set delay Z80 clock fall");
   Serial.println("");
   Serial.println("  i   shift image UP");
   Serial.println("  k   shift image DOWN");
@@ -313,10 +309,6 @@ void print_cap_sync_mode()
   case SELF:
     Serial.println("self-synchronizing");
     break;
-    
-  case Z80_FREQ_MODE:
-    Serial.println("Z80 clock");
-    break;
 
   case EXT:
     Serial.println("external clock");
@@ -347,19 +339,10 @@ void print_len_VS()
 }
 
 
-static char delay_no = 0;
-
 void print_capture_delay()
 {
-  if (delay_no==0) Serial.print("*");
   Serial.print("  Capture delay ext clock...... ");
   Serial.println(settings.delay, DEC);
-  if (delay_no==1) Serial.print("*");
-  Serial.print("  Capture delay Z80 clock rise. ");
-  Serial.println(settings.delay_rise, DEC);
-  if (delay_no==2) Serial.print("*");
-  Serial.print("  Capture delay Z80 clock fall. ");
-  Serial.println(settings.delay_fall, DEC);
 }
 
 void print_x_offset()
@@ -481,8 +464,8 @@ settings_t def_settings =
   .frequency = 7000000,
   .ext_clk_divider = 1,
   .delay = 5,
-  .delay_rise = 5,
-  .delay_fall = 5,
+  //.delay_rise = 5,
+  //.delay_fall = 5,
   .shX = 169,
   .shY = 56,
   .pin_inversion_mask = 0b1000000,
@@ -738,11 +721,6 @@ void loop()
 
         case '2':
           settings.cap_sync_mode = EXT;
-          print_cap_sync_mode();
-          break;
-        
-        case '3':
-          settings.cap_sync_mode = Z80_FREQ_MODE;
           print_cap_sync_mode();
           break;
 
@@ -1019,39 +997,12 @@ void loop()
           break;
 
         case 'a':
-          switch (delay_no)
-          {
-          case 0:
-            settings.delay = set_capture_delay(settings.delay + 1);
-            break;
-          case 1:
-            settings.delay_rise = set_capture_delay_rise(settings.delay_rise + 1);
-            break;
-          case 2:
-            settings.delay_fall = set_capture_delay_fall(settings.delay_fall + 1);
-            break;
-          default:
-            break;
-          }
- 
+          settings.delay = set_capture_delay(settings.delay + 1);
           print_capture_delay();
           break;
 
         case 'z':
-          switch (delay_no)
-          {
-          case 0:
-            settings.delay = set_capture_delay(settings.delay - 1);
-            break;
-          case 1:
-            settings.delay_rise = set_capture_delay_rise(settings.delay_rise - 1);
-            break;
-          case 2:
-            settings.delay_fall = set_capture_delay_fall(settings.delay_fall - 1);
-            break;
-          default:
-            break;
-          }
+          settings.delay = set_capture_delay(settings.delay - 1);
           print_capture_delay();
           break;
 
@@ -1073,21 +1024,6 @@ void loop()
         case 'l':
           settings.shX = set_capture_shX(settings.shX + 1);
           print_x_offset();
-          break;
-        
-        case '1':
-          delay_no = 0;
-          print_capture_delay();
-          break;
-
-        case '2':
-          delay_no = 1;
-          print_capture_delay();
-          break;
-
-        case '3':
-          delay_no = 2;
-          print_capture_delay();
           break;
 
         default:

@@ -10,13 +10,12 @@
 #include "inttypes.h"
 #include "stdbool.h"
 
-#define FW_VERSION "v1.2.1"
+#define FW_VERSION "v1.5.0"
 
 enum cap_sync_mode_t
 {
   SYNC_MODE_MIN,
   SELF = SYNC_MODE_MIN,
-  Z80_FREQ_MODE,
   EXT,
   SYNC_MODE_MAX = EXT,
 };
@@ -44,8 +43,6 @@ typedef struct settings_t
   uint32_t frequency;
   uint8_t ext_clk_divider;
   int8_t delay;
-  int8_t delay_rise;
-  int8_t delay_fall;
   int16_t shX;
   int16_t shY;
   uint8_t pin_inversion_mask;
@@ -176,13 +173,8 @@ extern uint32_t frame_count;
 #define SM_CAP 0
 
 // video buffer
-#if 0
-#define V_BUF_W 320
-#define V_BUF_H 320
-#else
 #define V_BUF_W (320*2)
-#define V_BUF_H 256
-#endif
+#define V_BUF_H 320
 #define V_BUF_SZ (V_BUF_H * V_BUF_W / 2)
 
 // settings MIN values
@@ -205,4 +197,5 @@ extern uint32_t frame_count;
 #define shY_MAX 200
 #define PIN_INVERSION_MASK 0x7f
 #define len_VS_MAX 1000
+
 #endif

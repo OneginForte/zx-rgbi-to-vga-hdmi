@@ -1,23 +1,18 @@
 #include "g_config.h"
 #include "v_buf.h"
 
-const uint8_t v_buf_no = 1;
-uint8_t *v_bufs[] = {g_v_buf, g_v_buf + V_BUF_SZ};//, g_v_buf + 2 * V_BUF_SZ};
-//uint8_t *v_bufs[1] = {g_v_buf};
+uint8_t *v_bufs[3] = {g_v_buf, g_v_buf + V_BUF_SZ, g_v_buf + 2 * V_BUF_SZ};
 
 bool show_v_buf[] = {false, false, false};
 
 uint8_t v_buf_in_idx = 0;
-//uint8_t v_buf_out_idx = 0;
+uint8_t v_buf_out_idx = 0;
 
 bool x3_buffering_mode = false;
 bool first_frame = true;
 
 void *__not_in_flash_func(get_v_buf_out)()
 {
-  //return v_bufs[0];
-  return v_bufs[(v_buf_in_idx+1)%v_buf_no];
-#if 0
   if (!x3_buffering_mode | first_frame)
     return v_bufs[0];
 
@@ -36,16 +31,10 @@ void *__not_in_flash_func(get_v_buf_out)()
   }
 
   return v_bufs[v_buf_out_idx];
-#endif
-  //return v_bufs[0];
 }
 
 void *__not_in_flash_func(get_v_buf_in)()
 {
-  //return v_bufs[0];
-  v_buf_in_idx = (v_buf_in_idx+1) % v_buf_no;
-  return v_bufs[v_buf_in_idx];
-#if 0
   if (!x3_buffering_mode)
     return v_bufs[0];
 
@@ -67,8 +56,6 @@ void *__not_in_flash_func(get_v_buf_in)()
   }
 
   return NULL;
-#endif
-  //return v_bufs[0];
 }
 
 void set_v_buf_buffering_mode(bool buffering_mode)

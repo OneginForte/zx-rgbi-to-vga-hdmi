@@ -179,7 +179,7 @@ void __not_in_flash_func(dma_handler_capture())
         {
           uint32_t val32 = *(uint32_t*)buf8;
           if ((val32 & sync32_mask) != sync32_mask)
-            goto sync;
+            break;
           x += 4;
           buf8 += 4;
           k -= 4;
@@ -188,29 +188,19 @@ void __not_in_flash_func(dma_handler_capture())
         {
           uint32_t val32 = *(uint32_t*)buf8;
           if ((val32 & sync32_mask) != sync32_mask)
-            goto sync;
+            break;
           x += 4;
           buf8 += 4;
           k -= 4;
           if (x >= V_BUF_W)
-            break;
+            continue;
           val32 = val32 & 0x0f0f0f0f;
           uint32_t v = (val32 | (val32 >> 4));
           *cap_buf8++ = v;// & 0xFF;
           *cap_buf8++ = (v >> 16);// & 0xFF;
         }
-        while (k>3)
-        {
-          uint32_t val32 = *(uint32_t*)buf8;
-          if ((val32 & sync32_mask) != sync32_mask)
-            goto sync;
-          x += 4;
-          buf8 += 4;
-          k -= 4;
-        }
       }
     }
-sync:    
 #endif
     uint8_t val8 = *buf8++;
 
