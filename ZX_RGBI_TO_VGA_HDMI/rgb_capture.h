@@ -1,7 +1,7 @@
 #ifndef RGB_CAPTURE_H
 #define RGB_CAPTURE_H
 
-#define SAMPL_F (8)
+#define SAMPL_F (12)
 #define H_SYNC_PULSE (48 * SAMPL_F / 10)  //  4 µs @ 7.0 MHz pixel clock
 #define V_SYNC_PULSE (40 * SAMPL_F) // 30 µs @ 7.0 MHz pixel clock
 

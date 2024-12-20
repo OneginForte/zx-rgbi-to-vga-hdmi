@@ -173,8 +173,9 @@ extern uint32_t frame_count;
 #define SM_CAP 0
 
 // video buffer
+// actual size is 512x240
 #define V_BUF_W (320*2)
-#define V_BUF_H 320
+#define V_BUF_H 260
 #define V_BUF_SZ (V_BUF_H * V_BUF_W / 2)
 
 // settings MIN values

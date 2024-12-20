@@ -184,6 +184,7 @@ void __not_in_flash_func(dma_handler_capture())
           buf8 += 4;
           k -= 4;
         }
+#if 0
         while (k>3)
         {
           uint32_t val32 = *(uint32_t*)buf8;
@@ -199,12 +200,37 @@ void __not_in_flash_func(dma_handler_capture())
           *cap_buf8++ = v;// & 0xFF;
           *cap_buf8++ = (v >> 16);// & 0xFF;
         }
+#else
+        const int n_rep = min(k / 4, (V_BUF_W - x) / 4);
+        int i;
+        for (i = 0; i < n_rep; ++i)
+        {
+          uint32_t val32 = *(uint32_t*)buf8;
+          if ((val32 & sync32_mask) != sync32_mask)
+          {
+            x_s = x;
+            break;
+          }
+          //goto sync;
+          //x += 4;
+          buf8 += 4;
+          //k -= 4;
+          //if (x >= V_BUF_W)
+          //  break;
+          val32 = val32 & 0x0f0f0f0f;
+          uint32_t v = (val32 | (val32 >> 4));
+          *cap_buf8++ = v;// & 0xFF;
+          *cap_buf8++ = (v >> 16);// & 0xFF;
+        }
+        x += 4 * i;
+        k -= 4 * i;
+#endif
         while (k>3)
         {
           uint32_t val32 = *(uint32_t*)buf8;
           if ((val32 & sync32_mask) != sync32_mask)
-            goto sync;
-          x += 4;
+            break;
+          //x += 4;
           buf8 += 4;
           k -= 4;
         }
@@ -218,7 +244,7 @@ sync:
 
     if ((val8 & sync_mask) != sync_mask) // detect active sync pulses
     {
-      if (CS_idx == H_SYNC_PULSE / 2) // start in the middle of the H_SYNC pulse // this should help ignore the spikes
+      if ((val8 & HS_MASK) == 0 && CS_idx == H_SYNC_PULSE / 2) // start in the middle of the H_SYNC pulse // this should help ignore the spikes
       {
         y++;
         // set the pointer to the beginning of a new line
@@ -227,20 +253,24 @@ sync:
       }
 
       CS_idx++;
+      CS_idx_s = CS_idx;
       if (x>0)
         x_s = x;
       x = -shX - 1;
 
-      if (sync_mask == (1u << HS_PIN)) // composite sync
+      if (sync_mask == HS_MASK) // composite sync
       {
         if (CS_idx < V_SYNC_PULSE) // detect V_SYNC pulse
           continue;
       }
-      else if (val8 & (1u << VS_PIN))
-        continue; 
+      else 
+      {
+        if (val8 & VS_MASK)
+          continue;
+      }
 
       // start capture of a new frame
-      if (y >= 0 && CS_idx == len_VS_pix)
+      if (y >= 0/* && CS_idx == len_VS_pix*/)
       {
         if (frame_count > 10) // power on delay // noise immunity at the sync input
           cap_buf = get_v_buf_in();
