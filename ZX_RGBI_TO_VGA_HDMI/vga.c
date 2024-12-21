@@ -1,3 +1,4 @@
+#include "hardware/pio.h"
 #include "g_config.h"
 #include "vga.h"
 #include "pio_programs.h"
@@ -19,6 +20,7 @@
 // wide   - show scanline twice in four lines
 #define NARROW_SCANLINE
 
+static int dma_ch0;
 static int dma_ch1;
 static video_mode_t video_mode;
 
@@ -223,6 +225,8 @@ void set_vga_scanlines_mode(bool sl_mode)
   scanlines_mode = sl_mode;
 }
 
+static uint offset = 0;
+
 void start_vga(video_mode_t v_mode)
 {
   video_mode = v_mode;
@@ -284,7 +288,7 @@ void start_vga(video_mode_t v_mode)
 
   // PIO initialization
   // PIO program load
-  uint offset = pio_add_program(PIO_VGA, &pio_program_vga);
+  offset = pio_add_program(PIO_VGA, &pio_program_vga);
 
   pio_sm_config c = pio_get_default_sm_config();
 
@@ -301,7 +305,7 @@ void start_vga(video_mode_t v_mode)
   pio_sm_set_enabled(PIO_VGA, SM_VGA, true);
 
   // DMA initialization
-  int dma_ch0 = dma_claim_unused_channel(true);
+  dma_ch0 = dma_claim_unused_channel(true);
   dma_ch1 = dma_claim_unused_channel(true);
 
   // main (data) DMA channel
@@ -346,4 +350,18 @@ void start_vga(video_mode_t v_mode)
   irq_set_enabled(DMA_IRQ_0, true);
 
   dma_start_channel_mask((1u << dma_ch0));
+}
+
+void stop_vga()
+{
+  pio_sm_set_enabled(PIO_VGA, SM_VGA, false);
+  pio_sm_init(PIO_VGA, SM_VGA, offset, NULL);
+  pio_remove_program(PIO_VGA, &pio_program_vga, offset);
+  dma_channel_set_irq0_enabled(dma_ch1, false);
+  dma_channel_abort(dma_ch0);
+  dma_channel_abort(dma_ch1);
+  dma_channel_cleanup(dma_ch0);
+  dma_channel_cleanup(dma_ch1);
+  dma_channel_unclaim(dma_ch0);
+  dma_channel_unclaim(dma_ch1);
 }

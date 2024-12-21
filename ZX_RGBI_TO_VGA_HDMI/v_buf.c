@@ -6,6 +6,7 @@ uint8_t *v_bufs[3] = {g_v_buf, g_v_buf + V_BUF_SZ, g_v_buf + 2 * V_BUF_SZ};
 bool show_v_buf[] = {false, false, false};
 
 uint8_t v_buf_in_idx = 0;
+const uint8_t v_buf_no = 2;
 uint8_t v_buf_out_idx = 0;
 
 bool x3_buffering_mode = false;
@@ -14,7 +15,7 @@ bool first_frame = true;
 void *__not_in_flash_func(get_v_buf_out)()
 {
   if (!x3_buffering_mode | first_frame)
-    return v_bufs[0];
+    return v_bufs[(v_buf_in_idx+1)%2];
 
   if (!show_v_buf[(v_buf_out_idx + 1) % 3])
   {
@@ -36,8 +37,10 @@ void *__not_in_flash_func(get_v_buf_out)()
 void *__not_in_flash_func(get_v_buf_in)()
 {
   if (!x3_buffering_mode)
-    return v_bufs[0];
-
+  {
+    v_buf_in_idx = (v_buf_in_idx+1)%v_buf_no;
+    return v_bufs[v_buf_in_idx];
+  }
   if (first_frame)
     first_frame = false;
 

@@ -19,5 +19,6 @@ void set_video_sync_mode(bool video_sync_mode);
 void check_settings(settings_t *settings);
 void calculate_clkdiv(float frequency, uint16_t *div_int, uint8_t *div_frac);
 void start_capture(settings_t *settings);
+void stop_capture();
 
 #endif

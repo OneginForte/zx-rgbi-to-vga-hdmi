@@ -10,6 +10,7 @@ extern "C"
 #include "vga.h"
 
 #include "hardware/flash.h"
+#include "hardware/gpio.h"
 }
 
 settings_t settings;
@@ -17,6 +18,7 @@ video_mode_t video_mode;
 
 const int *saved_settings = (const int *)(XIP_BASE + (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE));
 bool start_core0 = false;
+bool bRestart = false;
 
 void save_settings(settings_t *settings)
 {
@@ -454,7 +456,700 @@ void set_scanlines_mode()
     set_vga_scanlines_mode(settings.scanlines_mode);
 }
 
-settings_t def_settings =
+void save_and_reboot()
+{
+  save_settings(&settings);
+  // rp2040.restart();
+  watchdog_reboot(0, 0, 10);
+  while (1)
+  {
+  }
+}
+
+void process_menu(char &inbyte)
+{
+  if (inbyte != 'h' && Serial.available())
+    inbyte = Serial.read();
+
+  switch (inbyte)
+  {
+  case 'p':
+    print_settings();
+    inbyte = 0;
+    break;
+
+  case 'v':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+      case 'p':
+        print_video_out_mode();
+        break;
+
+      case 'h':
+        print_video_out_menu();
+        break;
+
+      case '1':
+        settings.video_out_mode = DVI;
+        print_video_out_mode();
+        break;
+
+      case '2':
+        settings.video_out_mode = VGA640x480;
+        print_video_out_mode();
+        break;
+
+      case '3':
+        settings.video_out_mode = VGA800x600;
+        print_video_out_mode();
+        break;
+
+      case '4':
+        settings.video_out_mode = VGA1024x768;
+        print_video_out_mode();
+        break;
+
+      case '5':
+        settings.video_out_mode = VGA1280x1024_d3;
+        print_video_out_mode();
+        break;
+      case '6':
+        settings.video_out_mode = VGA1280x1024_d4;
+        print_video_out_mode();
+        break;
+      case '7':
+        settings.video_out_mode = VGA1280x1024_d24;
+        print_video_out_mode();
+        break;
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 's':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+      case 'p':
+        print_scanlines_mode();
+        break;
+
+      case 'h':
+        print_scanlines_mode_menu();
+        break;
+
+      case 's':
+        settings.scanlines_mode = !settings.scanlines_mode;
+        print_scanlines_mode();
+        set_scanlines_mode();
+        break;
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 'b':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+      case 'p':
+        print_buffering_mode();
+        break;
+
+      case 'h':
+        print_buffering_mode_menu();
+        break;
+
+      case 'b':
+        settings.x3_buffering_mode = !settings.x3_buffering_mode;
+        print_buffering_mode();
+        set_v_buf_buffering_mode(settings.x3_buffering_mode);
+        break;
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 'c':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+      case 'p':
+        print_cap_sync_mode();
+        break;
+
+      case 'h':
+        print_cap_sync_mode_menu();
+        break;
+
+      case '1':
+        settings.cap_sync_mode = SELF;
+        print_cap_sync_mode();
+        break;
+
+      case '2':
+        settings.cap_sync_mode = EXT;
+        print_cap_sync_mode();
+        break;
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 'f':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+      case 'p':
+        print_capture_frequency();
+        break;
+
+      case 'h':
+        print_capture_frequency_menu();
+        break;
+
+      case '1':
+        settings.frequency = 7000000;
+        print_capture_frequency();
+        break;
+
+      case '2':
+        settings.frequency = 7093790;
+        print_capture_frequency();
+        break;
+
+      case '3':
+      {
+        String str_frequency = "";
+        uint32_t frequency = 0;
+
+        Serial.print("  Enter frequency: ");
+
+        while (1)
+        {
+          sleep_ms(10);
+          inbyte = 0;
+
+          if (Serial.available())
+            inbyte = Serial.read();
+
+          if (inbyte >= '0' && inbyte <= '9')
+          {
+            Serial.print(inbyte);
+            str_frequency += inbyte;
+          }
+
+          if (inbyte == '\r')
+          {
+            Serial.println("");
+            // frequency = str_frequency.toInt();
+
+            if (frequency >= FREQUENCY_MIN && frequency <= FREQUENCY_MAX)
+            {
+              settings.frequency = frequency;
+              print_capture_frequency();
+              break;
+            }
+            else
+            {
+              str_frequency = "";
+              Serial.print("  Allowed frequency range ..... ");
+              Serial.print((uint32_t)FREQUENCY_MIN, DEC);
+              Serial.print(" - ");
+              Serial.print((uint32_t)FREQUENCY_MAX, DEC);
+              Serial.println(" Hz");
+              Serial.print("  Enter frequency: ");
+            }
+          }
+        }
+
+        break;
+      }
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 'd':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+
+      case 'p':
+        print_ext_clk_divider();
+        break;
+
+      case 'h':
+        print_ext_clk_divider_menu();
+        break;
+
+      case 'a':
+        settings.ext_clk_divider = settings.ext_clk_divider < EXT_CLK_DIVIDER_MAX ? (settings.ext_clk_divider + 1) : EXT_CLK_DIVIDER_MAX;
+        print_ext_clk_divider();
+        break;
+
+      case 'z':
+        settings.ext_clk_divider = settings.ext_clk_divider > EXT_CLK_DIVIDER_MIN ? (settings.ext_clk_divider - 1) : EXT_CLK_DIVIDER_MIN;
+        print_ext_clk_divider();
+        break;
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+  case 'l':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+
+      case 'p':
+        print_len_VS();
+        break;
+
+      case 'h':
+        print_len_VS_menu();
+        break;
+
+      case 'a':
+        settings.len_VS = set_capture_len_VS(settings.len_VS + 1);
+        print_len_VS();
+        break;
+
+      case 'z':
+        settings.len_VS = set_capture_len_VS(settings.len_VS - 1);
+        print_len_VS();
+        break;
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 'y':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+      case 'p':
+        print_video_sync_mode();
+        break;
+
+      case 'h':
+        print_video_sync_mode_menu();
+        break;
+
+      case 'y':
+        settings.video_sync_mode = !settings.video_sync_mode;
+        print_video_sync_mode();
+        set_video_sync_mode(settings.video_sync_mode);
+        break;
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 't':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+
+      case 'p':
+        print_capture_delay();
+        print_x_offset();
+        print_y_offset();
+        break;
+
+      case 'h':
+        print_image_tuning_menu();
+        break;
+
+      case 'a':
+        settings.delay = set_capture_delay(settings.delay + 1);
+        print_capture_delay();
+        break;
+
+      case 'z':
+        settings.delay = set_capture_delay(settings.delay - 1);
+        print_capture_delay();
+        break;
+
+      case 'i':
+        settings.shY = set_capture_shY(settings.shY + 1);
+        print_y_offset();
+        break;
+
+      case 'k':
+        settings.shY = set_capture_shY(settings.shY - 1);
+        print_y_offset();
+        break;
+
+      case 'j':
+        settings.shX = set_capture_shX(settings.shX - 1);
+        print_x_offset();
+        break;
+
+      case 'l':
+        settings.shX = set_capture_shX(settings.shX + 1);
+        print_x_offset();
+        break;
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 'm':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+      case 'p':
+        print_pin_inversion_mask();
+        break;
+
+      case 'h':
+        print_pin_inversion_mask_menu();
+        break;
+
+      case 'm':
+      {
+        String str_pin_inversion_mask = "";
+
+        Serial.print("  Enter pin inversion mask: ");
+
+        while (1)
+        {
+          sleep_ms(10);
+          inbyte = 0;
+
+          if (Serial.available())
+            inbyte = Serial.read();
+
+          if (inbyte >= '0' && inbyte <= '1')
+          {
+            Serial.print(inbyte);
+            str_pin_inversion_mask += inbyte;
+          }
+
+          if (inbyte == '\r')
+          {
+            Serial.println("");
+
+            uint8_t pin_inversion_mask = 0;
+
+            for (uint32_t i = 0; i < str_pin_inversion_mask.length(); i++)
+            {
+              pin_inversion_mask <<= 1;
+              pin_inversion_mask |= str_pin_inversion_mask[i] == '1' ? 1 : 0;
+            }
+
+            if (!(pin_inversion_mask & ~PIN_INVERSION_MASK))
+            {
+              settings.pin_inversion_mask = pin_inversion_mask;
+              print_pin_inversion_mask();
+              break;
+            }
+            else
+            {
+              str_pin_inversion_mask = "";
+              Serial.print("  Allowed inversion mask ...... ");
+              Serial.println(binary_to_string(PIN_INVERSION_MASK, true));
+              Serial.print("  Enter pin inversion mask: ");
+            }
+          }
+        }
+
+        break;
+      }
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 'T':
+  {
+    inbyte = 'h';
+
+    while (1)
+    {
+      sleep_ms(10);
+
+      if (inbyte != 'h' && Serial.available())
+        inbyte = Serial.read();
+
+      switch (inbyte)
+      {
+      case 'p':
+        print_settings();
+        break;
+
+      case 'h':
+        print_test_menu();
+        break;
+
+      case 'i':
+        Serial.print("  Current frame count ......... ");
+        Serial.println(frame_count - 1, DEC);
+        break;
+
+      case '1':
+      case '2':
+      {
+        uint32_t frame_count_temp = frame_count;
+
+        sleep_ms(100);
+
+        if (frame_count - frame_count_temp == 0) // draw welcome screen only if capture is not active
+        {
+          Serial.println("  Drawing the welcome screen...");
+
+          if (inbyte == '1')
+            draw_welcome_screen(*(vga_modes[settings.video_out_mode]));
+          else
+            draw_welcome_screen_h(*(vga_modes[settings.video_out_mode]));
+        }
+
+        break;
+      }
+
+      default:
+        break;
+      }
+
+      if (inbyte == 'q')
+      {
+        inbyte = 'h';
+        break;
+      }
+
+      inbyte = 0;
+    }
+
+    break;
+  }
+
+  case 'h':
+    print_main_menu();
+    inbyte = 0;
+    break;
+
+  case 'w':
+    save_and_reboot();
+    break;
+
+  default:
+    break;
+  }
+}
+
+
+settings_t settings_mode1 =
 {
   .video_out_mode = VGA1280x1024_d24,
   .scanlines_mode = false,
@@ -472,14 +1167,39 @@ settings_t def_settings =
   .len_VS = 30*7,
 };
 
+settings_t settings_mode2 =
+{
+  .video_out_mode = VGA1280x1024_d4,
+  .scanlines_mode = false,
+  .x3_buffering_mode = false,
+  .video_sync_mode = true, // separate
+  .cap_sync_mode = EXT,
+  .frequency = 7000000,
+  .ext_clk_divider = 2,
+  .delay = 0,
+  //.delay_rise = 5,
+  //.delay_fall = 5,
+  .shX = 140,
+  .shY = 45,
+  .pin_inversion_mask = 0b1000000,
+  .len_VS = 30*7,
+};
+
 void setup()
 {
+  for (uint i=MODE1_PIN; i<=RESET_PIN; ++i)
+  {
+    gpio_init(i);
+    gpio_set_dir(i, GPIO_IN);
+    gpio_pull_up(i);
+  }
+
   Serial.begin(9600);
 
   // loading saved settings
   memcpy(&settings, saved_settings, sizeof(settings_t));
   if (settings.scanlines_mode)
-    settings = def_settings;
+    settings = settings_mode1;
   //settings.ext_clk_divider = 1;
   // correct if there is garbage in the cells
   check_settings(&settings);
@@ -508,16 +1228,41 @@ void setup()
 void loop()
 {
   char inbyte = 0;
-
+  uint8_t button_pressed = 0;
   while (1)
   {
-    sleep_ms(500);
+    sleep_ms(100);
 
     if (Serial.available())
     {
       inbyte = 'h';
       break;
     }
+    if (gpio_get(MODE1_PIN)==0 && button_pressed != 1)
+    {
+      button_pressed = 1;
+      settings = settings_mode1;
+    }
+    else if (gpio_get(MODE2_PIN)==0 && button_pressed != 2)
+    {
+      button_pressed = 2;
+      settings = settings_mode2;
+    }
+    else if (gpio_get(RESET_PIN)==0 && button_pressed != 3)
+    {
+      button_pressed = 3;
+      save_and_reboot();
+    }
+   else
+    {
+      button_pressed = 0;
+      continue;
+    }
+    //save_and_reboot(); 
+    stop_vga();
+    start_vga(*(vga_modes[settings.video_out_mode]));
+    bRestart = true;
+    continue;
   }
 
   Serial.println(" Entering the configuration mode");
@@ -527,684 +1272,7 @@ void loop()
   {
     sleep_ms(10);
 
-    if (inbyte != 'h' && Serial.available())
-      inbyte = Serial.read();
-
-    switch (inbyte)
-    {
-    case 'p':
-      print_settings();
-      inbyte = 0;
-      break;
-
-    case 'v':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-        case 'p':
-          print_video_out_mode();
-          break;
-
-        case 'h':
-          print_video_out_menu();
-          break;
-
-        case '1':
-          settings.video_out_mode = DVI;
-          print_video_out_mode();
-          break;
-
-        case '2':
-          settings.video_out_mode = VGA640x480;
-          print_video_out_mode();
-          break;
-
-        case '3':
-          settings.video_out_mode = VGA800x600;
-          print_video_out_mode();
-          break;
-
-        case '4':
-          settings.video_out_mode = VGA1024x768;
-          print_video_out_mode();
-          break;
-
-        case '5':
-          settings.video_out_mode = VGA1280x1024_d3;
-          print_video_out_mode();
-          break;
-        case '6':
-          settings.video_out_mode = VGA1280x1024_d4;
-          print_video_out_mode();
-          break;
-        case '7':
-          settings.video_out_mode = VGA1280x1024_d24;
-          print_video_out_mode();
-          break;
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 's':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-        case 'p':
-          print_scanlines_mode();
-          break;
-
-        case 'h':
-          print_scanlines_mode_menu();
-          break;
-
-        case 's':
-          settings.scanlines_mode = !settings.scanlines_mode;
-          print_scanlines_mode();
-          set_scanlines_mode();
-          break;
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 'b':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-        case 'p':
-          print_buffering_mode();
-          break;
-
-        case 'h':
-          print_buffering_mode_menu();
-          break;
-
-        case 'b':
-          settings.x3_buffering_mode = !settings.x3_buffering_mode;
-          print_buffering_mode();
-          set_v_buf_buffering_mode(settings.x3_buffering_mode);
-          break;
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 'c':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-        case 'p':
-          print_cap_sync_mode();
-          break;
-
-        case 'h':
-          print_cap_sync_mode_menu();
-          break;
-
-        case '1':
-          settings.cap_sync_mode = SELF;
-          print_cap_sync_mode();
-          break;
-
-        case '2':
-          settings.cap_sync_mode = EXT;
-          print_cap_sync_mode();
-          break;
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 'f':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-        case 'p':
-          print_capture_frequency();
-          break;
-
-        case 'h':
-          print_capture_frequency_menu();
-          break;
-
-        case '1':
-          settings.frequency = 7000000;
-          print_capture_frequency();
-          break;
-
-        case '2':
-          settings.frequency = 7093790;
-          print_capture_frequency();
-          break;
-
-        case '3':
-        {
-          String str_frequency = "";
-          uint32_t frequency = 0;
-
-          Serial.print("  Enter frequency: ");
-
-          while (1)
-          {
-            sleep_ms(10);
-            inbyte = 0;
-
-            if (Serial.available())
-              inbyte = Serial.read();
-
-            if (inbyte >= '0' && inbyte <= '9')
-            {
-              Serial.print(inbyte);
-              str_frequency += inbyte;
-            }
-
-            if (inbyte == '\r')
-            {
-              Serial.println("");
-              frequency = str_frequency.toInt();
-
-              if (frequency >= FREQUENCY_MIN && frequency <= FREQUENCY_MAX)
-              {
-                settings.frequency = frequency;
-                print_capture_frequency();
-                break;
-              }
-              else
-              {
-                str_frequency = "";
-                Serial.print("  Allowed frequency range ..... ");
-                Serial.print(FREQUENCY_MIN, DEC);
-                Serial.print(" - ");
-                Serial.print(FREQUENCY_MAX, DEC);
-                Serial.println(" Hz");
-                Serial.print("  Enter frequency: ");
-              }
-            }
-          }
-
-          break;
-        }
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 'd':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-
-        case 'p':
-          print_ext_clk_divider();
-          break;
-
-        case 'h':
-          print_ext_clk_divider_menu();
-          break;
-
-        case 'a':
-          settings.ext_clk_divider = settings.ext_clk_divider < EXT_CLK_DIVIDER_MAX ? (settings.ext_clk_divider + 1) : EXT_CLK_DIVIDER_MAX;
-          print_ext_clk_divider();
-          break;
-
-        case 'z':
-          settings.ext_clk_divider = settings.ext_clk_divider > EXT_CLK_DIVIDER_MIN ? (settings.ext_clk_divider - 1) : EXT_CLK_DIVIDER_MIN;
-          print_ext_clk_divider();
-          break;
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-    case 'l':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-
-        case 'p':
-          print_len_VS();
-          break;
-
-        case 'h':
-          print_len_VS_menu();
-          break;
-
-        case 'a':
-          settings.len_VS = set_capture_len_VS(settings.len_VS+1);
-          print_len_VS();
-          break;
-
-        case 'z':
-          settings.len_VS = set_capture_len_VS(settings.len_VS-1);
-          print_len_VS();
-          break;
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 'y':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-        case 'p':
-          print_video_sync_mode();
-          break;
-
-        case 'h':
-          print_video_sync_mode_menu();
-          break;
-
-        case 'y':
-          settings.video_sync_mode = !settings.video_sync_mode;
-          print_video_sync_mode();
-          set_video_sync_mode(settings.video_sync_mode);
-          break;
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 't':
-    {
-      inbyte = 'h';
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-
-        case 'p':
-          print_capture_delay();
-          print_x_offset();
-          print_y_offset();
-          break;
-
-        case 'h':
-          print_image_tuning_menu();
-          break;
-
-        case 'a':
-          settings.delay = set_capture_delay(settings.delay + 1);
-          print_capture_delay();
-          break;
-
-        case 'z':
-          settings.delay = set_capture_delay(settings.delay - 1);
-          print_capture_delay();
-          break;
-
-        case 'i':
-          settings.shY = set_capture_shY(settings.shY + 1);
-          print_y_offset();
-          break;
-
-        case 'k':
-          settings.shY = set_capture_shY(settings.shY - 1);
-          print_y_offset();
-          break;
-
-        case 'j':
-          settings.shX = set_capture_shX(settings.shX - 1);
-          print_x_offset();
-          break;
-
-        case 'l':
-          settings.shX = set_capture_shX(settings.shX + 1);
-          print_x_offset();
-          break;
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 'm':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-        case 'p':
-          print_pin_inversion_mask();
-          break;
-
-        case 'h':
-          print_pin_inversion_mask_menu();
-          break;
-
-        case 'm':
-        {
-          String str_pin_inversion_mask = "";
-
-          Serial.print("  Enter pin inversion mask: ");
-
-          while (1)
-          {
-            sleep_ms(10);
-            inbyte = 0;
-
-            if (Serial.available())
-              inbyte = Serial.read();
-
-            if (inbyte >= '0' && inbyte <= '1')
-            {
-              Serial.print(inbyte);
-              str_pin_inversion_mask += inbyte;
-            }
-
-            if (inbyte == '\r')
-            {
-              Serial.println("");
-
-              uint8_t pin_inversion_mask = 0;
-
-              for (uint32_t i = 0; i < str_pin_inversion_mask.length(); i++)
-              {
-                pin_inversion_mask <<= 1;
-                pin_inversion_mask |= str_pin_inversion_mask[i] == '1' ? 1 : 0;
-              }
-
-              if (!(pin_inversion_mask & ~PIN_INVERSION_MASK))
-              {
-                settings.pin_inversion_mask = pin_inversion_mask;
-                print_pin_inversion_mask();
-                break;
-              }
-              else
-              {
-                str_pin_inversion_mask = "";
-                Serial.print("  Allowed inversion mask ...... ");
-                Serial.println(binary_to_string(PIN_INVERSION_MASK, true));
-                Serial.print("  Enter pin inversion mask: ");
-              }
-            }
-          }
-
-          break;
-        }
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 'T':
-    {
-      inbyte = 'h';
-
-      while (1)
-      {
-        sleep_ms(10);
-
-        if (inbyte != 'h' && Serial.available())
-          inbyte = Serial.read();
-
-        switch (inbyte)
-        {
-        case 'p':
-          print_settings();
-          break;
-
-        case 'h':
-          print_test_menu();
-          break;
-
-        case 'i':
-          Serial.print("  Current frame count ......... ");
-          Serial.println(frame_count - 1, DEC);
-          break;
-
-        case '1':
-        case '2':
-        {
-          uint32_t frame_count_temp = frame_count;
-
-          sleep_ms(100);
-
-          if (frame_count - frame_count_temp == 0) // draw welcome screen only if capture is not active
-          {
-            Serial.println("  Drawing the welcome screen...");
-
-            if (inbyte == '1')
-              draw_welcome_screen(*(vga_modes[settings.video_out_mode]));
-            else
-              draw_welcome_screen_h(*(vga_modes[settings.video_out_mode]));
-          }
-
-          break;
-        }
-
-        default:
-          break;
-        }
-
-        if (inbyte == 'q')
-        {
-          inbyte = 'h';
-          break;
-        }
-
-        inbyte = 0;
-      }
-
-      break;
-    }
-
-    case 'h':
-      print_main_menu();
-      inbyte = 0;
-      break;
-
-    case 'w':
-      save_settings(&settings);
-      rp2040.restart();
-      break;
-
-    default:
-      break;
-    }
+    process_menu(inbyte);
 
     if (inbyte == 'q')
     {
@@ -1217,6 +1285,7 @@ void loop()
   }
 }
 
+
 void setup1()
 {
   while (!start_core0)
@@ -1227,5 +1296,12 @@ void setup1()
 
 void loop1()
 {
-  sleep_ms(1000);
+  if (bRestart)
+  {
+    sleep_ms(100);
+    stop_capture();
+    start_capture(&settings);
+    bRestart = false;
+  }
+  sleep_ms(100);
 }

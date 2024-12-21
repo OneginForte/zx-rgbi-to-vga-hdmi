@@ -127,6 +127,19 @@ extern uint32_t frame_count;
 #define F_PIN (CAP_PIN_D0 + 6)
 #endif
 
+#ifndef MODE1_PIN
+#define MODE1_PIN (26)
+#endif
+
+#ifndef MODE2_PIN
+#define MODE2_PIN (27)
+#endif
+
+#ifndef RESET_PIN
+#define RESET_PIN (28)
+#endif
+
+
 // DVI pins and settings
 #ifndef DVI_PIN_invert_diffpairs
 #define DVI_PIN_invert_diffpairs 0
