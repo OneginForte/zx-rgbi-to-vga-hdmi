@@ -177,6 +177,7 @@ void __not_in_flash_func(dma_handler_capture())
       }
       else
       {
+#if 0
         while (k>3 && x<0)
         {
           uint32_t val32 = *(uint32_t*)buf8;
@@ -186,6 +187,16 @@ void __not_in_flash_func(dma_handler_capture())
           buf8 += 4;
           k -= 4;
         }
+#else
+        uint32_t val32 = *(uint32_t*)buf8;
+        if (x<-3 && (val32 & sync32_mask) == sync32_mask)
+        {
+          int nPos = min(k,(-x))/4;
+          buf8 += nPos * 4;
+          x += nPos *4;
+          k -= nPos * 4;
+        }
+#endif
 #if 0
         while (k>3)
         {
